@@ -4,19 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
+        kahoot: {
+          purple: '#46178F',
+          'purple-light': '#864CBF',
+          'purple-dark': '#2D0A5E',
+          'purple-deep': '#1C0545',
+          red: '#E21B3C',
+          blue: '#1368CE',
+          yellow: '#D89E00',
+          green: '#26890C',
+          orange: '#FF6F00',
         },
+      },
+      fontFamily: {
+        display: ['Montserrat', 'system-ui', 'sans-serif'],
+        mono: ['Fira Code', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
     },
   },

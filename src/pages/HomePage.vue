@@ -1,81 +1,100 @@
 <template>
-  <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-    <div class="text-center">
-      <h1 class="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
-        Welcome to <span class="text-primary-600">CoHooter</span>
+  <div class="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4">
+    <div class="mb-10 text-center">
+      <h1 class="text-5xl sm:text-7xl font-black tracking-tight mb-2">
+        <span class="text-white">Co</span><span class="text-kahoot-yellow">Hooter</span>
       </h1>
-      <p class="mt-4 text-lg text-gray-500 max-w-2xl mx-auto">
-        Your Vue&nbsp;3 + Tailwind&nbsp;CSS + Supabase starter is ready to go.
-        Edit <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm font-mono">src/pages/HomePage.vue</code> to get started.
+      <p class="text-kahoot-purple-light text-lg font-semibold">
+        Code. Compete. Conquer.
       </p>
+    </div>
 
-      <div class="mt-10 flex justify-center gap-4">
-        <a
-          href="https://vuejs.org/guide/introduction.html"
-          target="_blank"
-          class="rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition"
+    <div class="card-kahoot w-full max-w-md p-8">
+      <div class="space-y-5">
+        <div>
+          <label for="gamePin" class="block text-sm font-semibold text-white/70 mb-1.5">
+            Game PIN
+          </label>
+          <input
+            id="gamePin"
+            v-model="gamePin"
+            type="text"
+            inputmode="numeric"
+            maxlength="7"
+            placeholder="Enter PIN"
+            class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3
+                   text-center text-2xl font-bold tracking-[0.3em] text-white
+                   placeholder:text-white/30 placeholder:tracking-normal placeholder:text-base
+                   focus:outline-none focus:ring-2 focus:ring-kahoot-yellow focus:border-transparent
+                   transition"
+          />
+        </div>
+
+        <div>
+          <label for="nickname" class="block text-sm font-semibold text-white/70 mb-1.5">
+            Nickname
+          </label>
+          <input
+            id="nickname"
+            v-model="nickname"
+            type="text"
+            maxlength="20"
+            placeholder="Your nickname"
+            class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3
+                   text-center text-lg font-bold text-white
+                   placeholder:text-white/30 placeholder:font-normal
+                   focus:outline-none focus:ring-2 focus:ring-kahoot-yellow focus:border-transparent
+                   transition"
+            @keyup.enter="handleJoin"
+          />
+        </div>
+
+        <p v-if="sessionError" class="text-kahoot-red text-sm text-center font-semibold">
+          {{ sessionError }}
+        </p>
+
+        <button
+          :disabled="!canJoin || sessionLoading"
+          @click="handleJoin"
+          class="btn-kahoot w-full bg-kahoot-green text-lg py-4 mt-2"
         >
-          Vue Docs
-        </a>
-        <a
-          href="https://supabase.com/docs"
-          target="_blank"
-          class="rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition"
-        >
-          Supabase Docs
-        </a>
+          {{ sessionLoading ? 'Joining…' : 'Enter Game' }}
+        </button>
       </div>
     </div>
 
-    <!-- Example: Supabase connection test -->
-    <div class="mt-16 mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900">Supabase Connection</h2>
-      <p class="mt-1 text-sm text-gray-500">
-        Click below to verify your Supabase connection.
-      </p>
-      <button
-        @click="testConnection"
-        :disabled="loading"
-        class="mt-4 w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 transition"
-      >
-        {{ loading ? 'Testing…' : 'Test Connection' }}
-      </button>
-      <p v-if="status" :class="statusClass" class="mt-3 text-sm font-medium">
-        {{ status }}
-      </p>
-    </div>
+    <RouterLink
+      to="/admin"
+      class="mt-8 text-sm text-white/40 hover:text-white/70 underline underline-offset-4 transition"
+    >
+      Educator / Admin Dashboard
+    </RouterLink>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { supabase } from '@/lib/supabase'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useSession } from '@/composables/useSession'
 
-const loading = ref(false)
-const status = ref('')
-const statusClass = ref('')
+const router = useRouter()
+const { join, loading: sessionLoading, error: sessionError } = useSession()
 
-async function testConnection() {
-  loading.value = true
-  status.value = ''
-  try {
-    const { error } = await supabase.from('_test_ping').select('*').limit(1)
-    if (error && error.code === '42P01') {
-      // Table doesn't exist — that's fine, connection itself worked
-      status.value = 'Connected to Supabase successfully!'
-      statusClass.value = 'text-green-600'
-    } else if (error) {
-      status.value = `Error: ${error.message}`
-      statusClass.value = 'text-red-600'
-    } else {
-      status.value = 'Connected to Supabase successfully!'
-      statusClass.value = 'text-green-600'
-    }
-  } catch (err) {
-    status.value = `Connection failed: ${err.message}`
-    statusClass.value = 'text-red-600'
-  } finally {
-    loading.value = false
+const gamePin = ref('')
+const nickname = ref('')
+
+const canJoin = computed(() =>
+  gamePin.value.trim().length >= 4 && nickname.value.trim().length >= 1
+)
+
+async function handleJoin() {
+  if (!canJoin.value) return
+  await join(gamePin.value.trim(), nickname.value.trim())
+  if (!sessionError.value) {
+    router.push({
+      name: 'Game',
+      query: { pin: gamePin.value.trim(), nick: nickname.value.trim() },
+    })
   }
 }
 </script>

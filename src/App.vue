@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen flex flex-col">
+  <div class="min-h-screen flex flex-col bg-kahoot-purple-deep">
     <NavBar />
-    <main class="flex-1">
+    <main class="flex-1 flex flex-col">
       <RouterView />
     </main>
   </div>

@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen;
+  }
+
+  ::selection {
+    @apply bg-kahoot-purple-light text-white;
+  }
+}
+
+@layer components {
+  .btn-kahoot {
+    @apply inline-flex items-center justify-center rounded-md px-6 py-3
+           font-bold text-white shadow-lg transition-all duration-150
+           hover:scale-105 hover:shadow-xl active:scale-95
+           disabled:opacity-50 disabled:hover:scale-100;
+  }
+
+  .card-kahoot {
+    @apply rounded-xl bg-white/10 backdrop-blur-sm border border-white/10
+           shadow-lg;
+  }
+
+  .code-area {
+    @apply w-full rounded-lg bg-gray-900 text-green-400 font-mono text-sm
+           p-4 resize-none outline-none border-2 border-transparent
+           focus:border-kahoot-purple-light transition-colors;
+  }
+}
