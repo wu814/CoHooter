@@ -19,6 +19,7 @@ export function useGame() {
   const submitted = ref(false)
   const running = ref(false)
   const submitting = ref(false)
+  const generating = ref(false) // Tracks if Gemini is currently thinking (you can add like a loading circle for this)
 
   // Timer
   const timerSeconds = ref(0)
@@ -54,9 +55,31 @@ export function useGame() {
     resetEditor()
   }
 
-  async function loadAIQuestion(params = {}) {
-    question.value = await generateQuestion(params)
-    resetEditor()
+  async function loadAIQuestion(topic = '') {
+    generating.value = true 
+    try {
+      // 1. Fetch the question from your service
+      const result = await generateQuestion({ category: topic }) 
+      
+      if (result) {
+        // 2. Update the main question state
+        question.value = result 
+        
+        // 3. This triggers resetEditor() which puts the code in the text area
+        resetEditor()
+        
+        // 4. LOG THIS: can show the data is ready
+        console.log("🚀 useGame: AI Data Loaded", {
+          title: result.title,
+          testCases: result.testCases
+        })
+      }
+    } catch (e) {
+      console.error("useGame AI Load Error:", e)
+      output.value = `AI Error: ${e.message}. Try clicking Gen AI again.`
+    } finally {
+      generating.value = false 
+    }
   }
 
   function resetEditor() {
@@ -124,6 +147,7 @@ export function useGame() {
     submitted,
     running,
     submitting,
+    generating, // added this to have something to show while gemini generates a question
     timerSeconds,
     timerRunning,
     passedCount,

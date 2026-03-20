@@ -1,10 +1,9 @@
 <template>
   <div class="flex flex-col h-[calc(100vh-4rem)]">
-    <!-- Top bar -->
     <div class="flex items-center justify-between px-4 py-3 bg-kahoot-purple-dark border-b border-white/10">
       <div class="flex items-center gap-3">
         <span class="bg-kahoot-blue text-white text-xs font-bold px-2.5 py-1 rounded-full">
-          Q{{ session.value?.currentQuestionIndex + 1 || 1 }}
+          Q{{ session?.currentQuestionIndex + 1 || 1 }}
         </span>
         <span class="text-sm text-white/60">
           Playing as <strong class="text-kahoot-yellow">{{ playerName }}</strong>
@@ -29,12 +28,34 @@
       </div>
     </div>
 
-    <!-- Main layout -->
     <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
-      <!-- LEFT: Question panel -->
       <div class="lg:w-2/5 border-b lg:border-b-0 lg:border-r border-white/10 overflow-y-auto">
-        <div v-if="question" class="p-6">
+        
+        <div class="p-6 pb-0">
+          <div class="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+            <label class="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
+              Question Suggestion
+            </label>
+            <div class="flex gap-2">
+              <input 
+                v-model="aiTopic" 
+                placeholder="e.g. Lists, Loops, Math..." 
+                class="flex-1 bg-gray-950 text-white text-xs px-3 py-2 rounded-lg border border-white/5 outline-none focus:ring-1 focus:ring-kahoot-purple-light"
+                @keyup.enter="loadAIQuestion(aiTopic)"
+              />
+              <button 
+                @click="loadAIQuestion(aiTopic)" 
+                :disabled="generating"
+                class="bg-kahoot-purple hover:bg-kahoot-purple-light text-white text-xs font-bold px-4 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg active:scale-95"
+              >
+                {{ generating ? 'Generating...' : 'Gen AI' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="question" class="p-6 pt-2">
           <div class="flex items-center gap-2 mb-4">
             <span class="bg-kahoot-orange text-white text-xs font-bold px-2 py-0.5 rounded">
               {{ question.difficulty }}
@@ -71,13 +92,11 @@
         </div>
 
         <div v-else class="p-6 text-center text-white/30">
-          <p>Loading question…</p>
+          <p>Click 'Gen AI' or enter a topic to start!</p>
         </div>
       </div>
 
-      <!-- RIGHT: Editor + results -->
       <div class="flex-1 flex flex-col overflow-hidden">
-        <!-- Toolbar -->
         <div class="flex items-center justify-between px-4 py-2 bg-gray-900/80 border-b border-white/10">
           <select
             v-model="language"
@@ -101,7 +120,6 @@
           </div>
         </div>
 
-        <!-- Code editor -->
         <div class="flex-1 overflow-hidden relative">
           <div class="absolute inset-0 flex">
             <div class="w-12 bg-gray-900 border-r border-white/5 pt-4 text-right pr-2 overflow-hidden select-none">
@@ -119,7 +137,6 @@
           </div>
         </div>
 
-        <!-- Results panel -->
         <div class="h-48 border-t border-white/10 bg-gray-950 flex flex-col">
           <div class="flex">
             <button
@@ -137,12 +154,10 @@
             </button>
           </div>
           <div class="flex-1 overflow-auto p-4 font-mono text-xs">
-            <!-- Output tab -->
             <div v-if="activeTab === 'output'" class="text-white/70">
               <p v-if="!output" class="text-white/30 italic">Run your code to see output here…</p>
               <pre v-else class="whitespace-pre-wrap">{{ output }}</pre>
             </div>
-            <!-- Test results tab -->
             <div v-else-if="activeTab === 'results'" class="text-white/70">
               <div v-if="!submitted" class="text-white/30 italic">
                 Submit your code to see test results…
@@ -179,12 +194,17 @@ import { useGame } from '@/composables/useGame'
 const route = useRoute()
 const { session, playerName } = useSession()
 
+const aiTopic = ref('')
+
 const {
   question, language, code, output,
   testResults, submitted, running, submitting,
+  generating,
   timerSeconds, passedCount, totalTests, allPassed, lineCount,
   languages,
-  loadQuestion, run, submit,
+  loadQuestion,
+  loadAIQuestion,
+  run, submit,
 } = useGame()
 
 const activeTab = ref('output')
@@ -202,7 +222,18 @@ function insertTab(e) {
   })
 }
 
+// FIXED: Updated to Vite-standard environment check
+if (import.meta.env.DEV) {
+  window.testAI = (topic) => loadAIQuestion(topic)
+}
+
+// In src/pages/GamePage.vue
 onMounted(() => {
-  loadQuestion(route.query.qid ?? 'default')
+  if (route.query.qid) {
+    loadQuestion(route.query.qid)
+  } else {
+    // loadAIQuestion() <--- Comment this out for now!
+    console.log("Auto-load disabled. Click 'Gen AI' manually to test.")
+  }
 })
 </script>
