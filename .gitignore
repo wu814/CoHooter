@@ -19,3 +19,5 @@ dist/
 # Backend cache
 backend/__pycache__/*
 backend/judge/__pycache__/*
+backend/routes/__pycache__/*
+venv

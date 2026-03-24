@@ -1,16 +1,13 @@
 /**
  * Code execution service — runs or judges player-submitted code.
  *
- * IMPLEMENT: Replace the stubs below with your execution backend.
- *   Options include:
- *   - A serverless function (Supabase Edge Function, AWS Lambda, etc.)
- *   - A sandboxed execution API (Judge0, Piston, etc.)
- *   - Your own containerized runner
- *
- * Both functions return arrays of TestResult objects (see models/index.js).
+ * Connects to the Flask/Judge0 backend at VITE_BACKEND_URL.
+ * Falls back gracefully if backend is not configured or unavailable.
  */
 
 import { createTestResult } from '@/models'
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
 /**
  * Run code and return raw stdout output (no judging).
@@ -18,15 +15,40 @@ import { createTestResult } from '@/models'
  * @returns {Promise<string>} stdout output
  */
 export async function runCode({ code, language, stdin = '' }) {
-  // IMPLEMENT: Send code to your execution backend.
-  //   e.g. const res = await fetch('/api/run', {
-  //     method: 'POST',
-  //     body: JSON.stringify({ code, language, stdin }),
-  //   })
-  //   const { stdout } = await res.json()
-  //   return stdout
+  // If no backend URL configured, return informative message
+  if (!BACKEND_URL) {
+    return '[Backend not configured. Set VITE_BACKEND_URL in .env]'
+  }
 
-  return `[placeholder] Running ${language} code…\nConnect a code execution backend in services/codeRunner.js`
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_code: code,
+        stdin: stdin,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.error || `HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
+
+    // Format output for display
+    let output = ''
+    if (result.stdout) output += result.stdout
+    if (result.stderr) output += `\n[stderr]\n${result.stderr}`
+    if (result.status !== 'Accepted') {
+      output += `\n[Status: ${result.status}]`
+    }
+
+    return output || '[No output]'
+  } catch (err) {
+    return `[Run error: ${err.message}]`
+  }
 }
 
 /**
@@ -35,20 +57,58 @@ export async function runCode({ code, language, stdin = '' }) {
  * @returns {Promise<TestResult[]>}
  */
 export async function submitCode({ code, language, testCases = [] }) {
-  // IMPLEMENT: Send code + test cases to your judging backend.
-  //   e.g. const res = await fetch('/api/submit', {
-  //     method: 'POST',
-  //     body: JSON.stringify({ code, language, testCases }),
-  //   })
-  //   return (await res.json()).results.map(r => createTestResult(r))
+  // If no backend URL configured, return informative stub
+  if (!BACKEND_URL) {
+    return testCases.map((tc, i) =>
+      createTestResult({
+        passed: false,
+        input: tc.input ?? `test ${i + 1}`,
+        expected: tc.expected ?? '',
+        actual: '',
+        error: 'Backend not configured. Set VITE_BACKEND_URL in .env',
+      })
+    )
+  }
 
-  return testCases.map((tc, i) =>
-    createTestResult({
-      passed: false,
-      input: tc.input ?? `test ${i + 1}`,
-      expected: tc.expected ?? '',
-      actual: '',
-      error: 'Code runner not connected. Implement submitCode() in services/codeRunner.js',
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_code: code,
+        test_cases: testCases.map(tc => ({
+          input: tc.input,
+          expected: tc.expected,
+        })),
+      }),
     })
-  )
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error.error || `HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    return data.results.map(r =>
+      createTestResult({
+        passed: r.passed,
+        input: r.input,
+        expected: r.expected,
+        actual: r.actual_output || '',
+        error: r.error_message,
+      })
+    )
+  } catch (err) {
+    // Network error - return graceful fallback
+    return testCases.map((tc, i) =>
+      createTestResult({
+        passed: false,
+        input: tc.input ?? `test ${i + 1}`,
+        expected: tc.expected ?? '',
+        actual: '',
+        error: `Backend error: ${err.message}`,
+      })
+    )
+  }
 }

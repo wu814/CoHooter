@@ -7,41 +7,159 @@ Players join a session with a Game PIN, solve timed coding challenges, and compe
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) v18+
+- [Python](https://python.org/) 3.10+
 - A [Supabase](https://supabase.com/) project (free tier works)
+- A [Judge0 RapidAPI](https://rapidapi.com/judge0-official/api/judge0-ce) key (free tier: 50 submissions/day)
 
-## Getting Started
+## Quick Start
+
+### Step 1: Get API Keys (Before You Begin)
+
+You'll need these API keys:
+
+| Service | Purpose | Where to Get |
+|---------|---------|--------------|
+| **Judge0 RapidAPI** | Code execution | [rapidapi.com/judge0-official/api/judge0-ce](https://rapidapi.com/judge0-official/api/judge0-ce) (free: 50/day) |
+| **Supabase** | Database & auth | [supabase.com](https://supabase.com/) (free tier available) |
+| **Gemini API** | AI question generation | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free tier available) |
+
+### Step 2: Backend Setup
+
+Open **Terminal 1** and run:
 
 ```bash
-npm install
-cp .env.example .env      # fill in your Supabase credentials
-npm run dev                # → http://localhost:5173
+# 1. Create and activate Python virtual environment
+python3 -m venv venv
+source venv/bin/activate        # On Windows: venv\Scripts\activate
+
+# 2. Install Python dependencies
+pip install -r backend/requirements.txt
+
+# 3. Create backend environment file
+cp backend/.env.example backend/.env
 ```
+
+Now edit `backend/.env` and add your Judge0 API key:
+
+```env
+JUDGE0_PROVIDER=rapid
+JUDGE0_RAPID_API_KEY=your-rapidapi-key-here   # ← Replace with your key
+```
+
+Start the backend server:
+
+```bash
+# 4. Run the backend (keep this terminal open)
+python -m backend.app
+```
+
+You should see: `Running on http://127.0.0.1:5000`
+
+### Step 3: Frontend Setup
+
+Open **Terminal 2** (keep backend running in Terminal 1):
+
+```bash
+# 1. Install Node.js dependencies
+npm install
+
+# 2. Create frontend environment file
+cp .env.example .env
+```
+
+Now edit `.env` and add your API keys:
+
+```env
+VITE_BACKEND_URL=http://localhost:5000
+VITE_SUPABASE_URL=https://your-project.supabase.co    # ← Replace
+VITE_SUPABASE_ANON_KEY=your-anon-key-here             # ← Replace
+VITE_GEMINI_API_KEY=your-gemini-key-here              # ← Replace
+```
+
+Start the frontend:
+
+```bash
+# 3. Run the frontend dev server
+npm run dev
+```
+
+You should see: `Local: http://localhost:5173/`
+
+### Step 4: Verify Everything Works
+
+Open your browser and go to **http://localhost:5173**
+
+To test the backend directly, run in a new terminal:
+
+```bash
+# Test code execution
+curl -X POST http://localhost:5000/api/submit \
+  -H "Content-Type: application/json" \
+  -d '{"user_code": "def solution(a, b): return a + b", "test_cases": [{"input": "solution(1, 2)", "expected": "3"}]}'
+```
+
+Expected response:
+```json
+{
+  "all_passed": true,
+  "passed": 1,
+  "score_percent": 100.0,
+  ...
+}
+```
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `venv/bin/activate: No such file` | Run `python3 -m venv venv` first |
+| `Module not found` errors | Make sure venv is activated: `source venv/bin/activate` |
+| Backend connection refused | Ensure backend is running in Terminal 1 |
+| Judge0 API errors | Check your RapidAPI key is correct in `backend/.env` |
+| Supabase errors | Verify your Supabase URL and anon key in `.env` |
 
 ## Architecture
 
 ```
-src/
-├── models/index.js          ← Data schemas (Question, Player, Session, etc.)
-├── services/                ← Backend integration layer (implement these)
-│   ├── questionService.js   ←   Fetch / AI-generate questions
-│   ├── codeRunner.js        ←   Execute & judge code submissions
-│   └── sessionService.js    ←   Session CRUD, leaderboard, analytics
-├── composables/             ← Reactive state shared across components
-│   ├── useSession.js        ←   Join / create / leave sessions
-│   ├── useGame.js           ←   Question, editor, timer, run/submit
-│   └── useScoreboard.js     ←   Leaderboard with optional polling
-├── components/
-│   └── NavBar.vue
-├── pages/
-│   ├── HomePage.vue         ←   Entry screen — Game PIN + nickname
-│   ├── GamePage.vue         ←   Coding challenge (question + editor + results)
-│   ├── ScoreboardPage.vue   ←   Live leaderboard
-│   └── AdminPage.vue        ←   Educator analytics dashboard
-├── lib/supabase.js          ← Supabase client (reads from .env)
-├── router/index.js
-├── assets/main.css
-├── App.vue
-└── main.js
+CoHooter/
+├── src/
+│   ├── models/index.js          ← Data schemas (Question, Player, Session, etc.)
+│   ├── services/                ← Backend integration layer
+│   │   ├── questionService.js   ←   Fetch / AI-generate questions
+│   │   ├── codeRunner.js        ←   Execute & judge code submissions
+│   │   └── sessionService.js    ←   Session CRUD, leaderboard, analytics
+│   ├── composables/             ← Reactive state shared across components
+│   │   ├── useSession.js        ←   Join / create / leave sessions
+│   │   ├── useGame.js           ←   Question, editor, timer, run/submit
+│   │   └── useScoreboard.js     ←   Leaderboard with optional polling
+│   ├── components/
+│   │   └── NavBar.vue
+│   ├── pages/
+│   │   ├── HomePage.vue         ←   Entry screen — Game PIN + nickname
+│   │   ├── GamePage.vue         ←   Coding challenge (question + editor + results)
+│   │   ├── ScoreboardPage.vue   ←   Live leaderboard
+│   │   └── AdminPage.vue        ←   Educator analytics dashboard
+│   ├── lib/supabase.js          ← Supabase client (reads from .env)
+│   ├── router/index.js
+│   ├── assets/main.css
+│   ├── App.vue
+│   └── main.js
+├── backend/                     ← Python Flask code execution backend
+│   ├── app.py                   ←   Flask + SocketIO entry point
+│   ├── config.py                ←   Environment configuration
+│   ├── requirements.txt         ←   Python dependencies
+│   ├── .env.example             ←   Template for backend environment
+│   ├── judge/                   ←   Code execution module
+│   │   ├── models.py            ←   TestCase, GradingResult dataclasses
+│   │   ├── client.py            ←   Judge0 SDK wrapper
+│   │   └── runner.py            ←   Grading orchestration
+│   ├── routes/
+│   │   └── submission.py        ←   /api/submit, /api/run endpoints
+│   └── tests/                   ←   Unit & integration tests
+├── package.json
+├── vite.config.js
+├── .env.example                 ← Template for frontend environment
+└── README.md
 ```
 
 ## How to implement
@@ -99,15 +217,38 @@ Extend these as your schema evolves.
 
 ## Scripts
 
-| Command           | Description               |
-| ----------------- | ------------------------- |
-| `npm run dev`     | Start dev server          |
-| `npm run build`   | Build for production      |
-| `npm run preview` | Preview production build  |
+| Command           | Description                    |
+| ----------------- | ------------------------------ |
+| `npm run dev`     | Start frontend dev server      |
+| `npm run build`   | Build frontend for production  |
+| `npm run preview` | Preview production build       |
 
 ## Environment Variables
 
+### Frontend (.env)
+
 | Variable                  | Description                        |
 | ------------------------- | ---------------------------------- |
+| `VITE_BACKEND_URL`       | Backend URL (default: http://localhost:5000) |
 | `VITE_SUPABASE_URL`      | Your Supabase project URL          |
 | `VITE_SUPABASE_ANON_KEY` | Your Supabase anonymous/public key |
+| `VITE_GEMINI_API_KEY`    | Gemini API key for AI questions    |
+
+### Backend (backend/.env)
+
+| Variable              | Description                              |
+| --------------------- | ---------------------------------------- |
+| `JUDGE0_PROVIDER`     | API provider: `rapid` or `self-hosted`   |
+| `JUDGE0_RAPID_API_KEY`| RapidAPI key (for `rapid` provider)      |
+| `JUDGE0_BASE_URL`     | Self-hosted URL (for `self-hosted`)      |
+| `JUDGE0_CPU_LIMIT`    | CPU time limit in seconds (default: 5)   |
+| `JUDGE0_MEMORY_LIMIT` | Memory limit in KB (default: 128000)     |
+| `FLASK_SECRET_KEY`    | Flask session secret key                 |
+
+---
+
+## Judge0 API Key
+
+Get your RapidAPI key at: https://rapidapi.com/judge0-official/api/judge0-ce
+
+Self-hosted Judge0 is also supported for advanced users.
