@@ -8,8 +8,8 @@ Players join a session with a Game PIN, solve timed coding challenges, and compe
 
 - [Node.js](https://nodejs.org/) v18+
 - [Python](https://python.org/) 3.10+
-- A [Supabase](https://supabase.com/) project (free tier works)
-- A [Judge0 RapidAPI](https://rapidapi.com/judge0-official/api/judge0-ce) key (free tier: 50 submissions/day)
+- A [Supabase](https://supabase.com/) project 
+- A [Judge0 RapidAPI](https://rapidapi.com/judge0-official/api/judge0-ce) key 
 
 ## Quick Start
 
@@ -19,9 +19,9 @@ You'll need these API keys:
 
 | Service | Purpose | Where to Get |
 |---------|---------|--------------|
-| **Judge0 RapidAPI** | Code execution | [rapidapi.com/judge0-official/api/judge0-ce](https://rapidapi.com/judge0-official/api/judge0-ce) (free: 50/day) |
-| **Supabase** | Database & auth | [supabase.com](https://supabase.com/) (free tier available) |
-| **Gemini API** | AI question generation | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free tier available) |
+| **Judge0 RapidAPI** | Code execution | [rapidapi.com/judge0-official/api/judge0-ce](https://rapidapi.com/judge0-official/api/judge0-ce) |
+| **Supabase** | Database & auth | [supabase.com](https://supabase.com/) |
+| **Gemini API** | AI question generation | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
 
 ### Step 2: Backend Setup
 
