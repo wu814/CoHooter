@@ -15,3 +15,7 @@ dist/
 .DS_Store
 *.local
 *.sw?
+
+# Backend cache
+backend/__pycache__/*
+backend/judge/__pycache__/*
