@@ -26,11 +26,11 @@ Use this EXACT JSON structure:
 const MOCK_QUESTION = {
   title: "Mock: Sum of Two Numbers",
   description: "Create a function named 'solution' that takes two numbers, a and b, and returns their sum.",
-  starter_code: "def solution(a, b):\n    # Write your code here\n    return a + b",
+  starter_code: "def solution(a, b):\n    # Write your code here\n    pass",
   test_cases: [
-    { input: "1, 2", expected: "3" },
-    { input: "10, 20", expected: "30" },
-    { input: "-5, 5", expected: "0" }
+    { input: "solution(1, 2)", expected: "3" },
+    { input: "solution(10, 20)", expected: "30" },
+    { input: "solution(-5, 5)", expected: "0" }
   ]
 };
 
@@ -62,20 +62,19 @@ export async function generateQuestion({ category = '' } = {}) {
     });
   } catch (e) {
     console.warn("AI Generation failed or throttled. Falling back to Mock Data.", e);
-    
+
     // Return the mock question so the UI doesn't break
     return createQuestion({
       id: crypto.randomUUID(),
-      title: data.title,
-      description: data.description,
+      title: MOCK_QUESTION.title,
+      description: MOCK_QUESTION.description,
       difficulty: 'Easy',
       category: selectedTopic,
-      starterCode: { python: data.starter_code || data.boilerplate_code || "" },
-      // Updated mapping to ensure everything is a string for Judge0
-      testCases: (data.test_cases || []).map(tc => ({ 
+      starterCode: { python: MOCK_QUESTION.starter_code },
+      testCases: MOCK_QUESTION.test_cases.map(tc => ({
         input: String(tc.input),
-        expected: String(tc.expected), 
-        hidden: false 
+        expected: String(tc.expected),
+        hidden: false
       }))
     });
   }

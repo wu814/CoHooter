@@ -108,7 +108,11 @@ export function useGame() {
     running.value = true
     output.value = ''
     try {
-      output.value = await execRun({ code: code.value, language: language.value })
+      output.value = await execRun({
+        code: code.value,
+        language: language.value,
+        testCases: question.value?.testCases ?? [],
+      })
     } catch (e) {
       output.value = `Error: ${e.message}`
     } finally {

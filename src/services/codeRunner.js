@@ -10,24 +10,32 @@ import { createTestResult } from '@/models'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
 /**
- * Run code and return raw stdout output (no judging).
- * @param {{ code: string, language: string, stdin?: string }} params
- * @returns {Promise<string>} stdout output
+ * Run code and return output. If testCases provided, returns test results.
+ * @param {{ code: string, language: string, stdin?: string, testCases?: Array }} params
+ * @returns {Promise<string>} formatted output string
  */
-export async function runCode({ code, language, stdin = '' }) {
+export async function runCode({ code, language, stdin = '', testCases = [] }) {
   // If no backend URL configured, return informative message
   if (!BACKEND_URL) {
     return '[Backend not configured. Set VITE_BACKEND_URL in .env]'
   }
 
   try {
+    // Build request body - include test_cases if provided
+    const body = { user_code: code }
+    if (testCases.length > 0) {
+      body.test_cases = testCases.map(tc => ({
+        input: tc.input,
+        expected: tc.expected,
+      }))
+    } else {
+      body.stdin = stdin
+    }
+
     const response = await fetch(`${BACKEND_URL}/api/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_code: code,
-        stdin: stdin,
-      }),
+      body: JSON.stringify(body),
     })
 
     if (!response.ok) {
@@ -37,7 +45,12 @@ export async function runCode({ code, language, stdin = '' }) {
 
     const result = await response.json()
 
-    // Format output for display
+    // If response has results array, format test case output
+    if (result.results) {
+      return formatTestCaseResults(result.results)
+    }
+
+    // Otherwise, format simple execution output
     let output = ''
     if (result.stdout) output += result.stdout
     if (result.stderr) output += `\n[stderr]\n${result.stderr}`
@@ -49,6 +62,34 @@ export async function runCode({ code, language, stdin = '' }) {
   } catch (err) {
     return `[Run error: ${err.message}]`
   }
+}
+
+/**
+ * Format test case results for display in the output terminal.
+ */
+function formatTestCaseResults(results) {
+  const lines = []
+  let passedCount = 0
+
+  results.forEach((r, i) => {
+    const status = r.passed ? 'PASS' : 'FAIL'
+    if (r.passed) passedCount++
+
+    lines.push(`Test ${i + 1}: ${status}`)
+    lines.push(`  Input:    ${r.input}`)
+    lines.push(`  Expected: ${r.expected}`)
+    lines.push(`  Actual:   ${r.actual_output || '(no output)'}`)
+    if (r.error_message) {
+      lines.push(`  Error:    ${r.error_message}`)
+    }
+    lines.push('')
+  })
+
+  const summary = `${passedCount}/${results.length} tests passed`
+  lines.push('─'.repeat(30))
+  lines.push(summary)
+
+  return lines.join('\n')
 }
 
 /**
