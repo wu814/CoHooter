@@ -52,6 +52,7 @@
                 v-for="s in stats.sessions"
                 :key="s.id"
                 class="border-b border-white/5 hover:bg-white/5 transition cursor-pointer"
+                @click="router.push({ name: 'Host', query: { pin: s.pin } })"
               >
                 <td class="px-6 py-4 font-semibold text-white">{{ s.name }}</td>
                 <td class="px-6 py-4 font-mono text-kahoot-yellow">{{ s.pin }}</td>
@@ -76,7 +77,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { fetchAdminStats } from '@/services/sessionService'
+import { useRouter } from 'vue-router'
+import { fetchAdminStats, createGameSession } from '@/services/sessionService'
+
+const router = useRouter()
 
 const loading = ref(false)
 const stats = ref({ totalSessions: 0, totalPlayers: 0, avgCompletion: 0, activeSessions: 0, sessions: [] })
@@ -99,8 +103,13 @@ function statusBadge(status) {
   return STATUS_COLORS[status] || 'bg-white/10 text-white/50'
 }
 
-function handleNewSession() {
-  // IMPLEMENT: Open a modal or navigate to a session-creation flow.
+async function handleNewSession() {
+  try {
+    const session = await createGameSession({ hostId: 'admin' })
+    router.push({ name: 'Host', query: { pin: session.pin } })
+  } catch (e) {
+    alert(`Failed to create session: ${e.message}`)
+  }
 }
 
 onMounted(async () => {

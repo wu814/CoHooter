@@ -82,6 +82,11 @@ export function useGame() {
     }
   }
 
+  function setQuestion(q) {
+    question.value = q
+    resetEditor()
+  }
+
   function resetEditor() {
     if (question.value?.starterCode?.[language.value]) {
       code.value = question.value.starterCode[language.value]
@@ -161,6 +166,7 @@ export function useGame() {
     languages: LANGUAGES,
     loadQuestion,
     loadAIQuestion,
+    setQuestion,
     resetEditor,
     startTimer,
     stopTimer,

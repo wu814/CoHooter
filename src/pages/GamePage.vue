@@ -31,31 +31,19 @@
     <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
       <div class="lg:w-2/5 border-b lg:border-b-0 lg:border-r border-white/10 overflow-y-auto">
-        
-        <div class="p-6 pb-0">
-          <div class="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
-            <label class="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
-              Question Suggestion
-            </label>
-            <div class="flex gap-2">
-              <input 
-                v-model="aiTopic" 
-                placeholder="e.g. Lists, Loops, Math..." 
-                class="flex-1 bg-gray-950 text-white text-xs px-3 py-2 rounded-lg border border-white/5 outline-none focus:ring-1 focus:ring-kahoot-purple-light"
-                @keyup.enter="loadAIQuestion(aiTopic)"
-              />
-              <button 
-                @click="loadAIQuestion(aiTopic)" 
-                :disabled="generating"
-                class="bg-kahoot-purple hover:bg-kahoot-purple-light text-white text-xs font-bold px-4 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg active:scale-95"
-              >
-                {{ generating ? 'Generating...' : 'Gen AI' }}
-              </button>
-            </div>
+
+        <!-- Waiting for host -->
+        <div v-if="waitingForHost && !question" class="p-6 flex flex-col items-center justify-center h-full">
+          <div class="w-12 h-12 rounded-full bg-kahoot-purple-light/30 flex items-center justify-center mb-4 animate-pulse">
+            <svg class="w-6 h-6 text-kahoot-purple-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
+          <p class="text-white/50 text-lg font-semibold">Waiting for host...</p>
+          <p class="text-white/30 text-sm mt-1">The host will push a question shortly.</p>
         </div>
 
-        <div v-if="question" class="p-6 pt-2">
+        <div v-if="question" class="p-6">
           <div class="flex items-center gap-2 mb-4">
             <span class="bg-kahoot-orange text-white text-xs font-bold px-2 py-0.5 rounded">
               {{ question.difficulty }}
@@ -91,8 +79,8 @@
           </div>
         </div>
 
-        <div v-else class="p-6 text-center text-white/30">
-          <p>Click 'Gen AI' or enter a topic to start!</p>
+        <div v-else-if="!waitingForHost" class="p-6 text-center text-white/30">
+          <p>No question loaded yet.</p>
         </div>
       </div>
 
@@ -114,7 +102,7 @@
               </svg>
               {{ running ? 'Running…' : 'Run' }}
             </button>
-            <button @click="submit" :disabled="submitting" class="btn-kahoot bg-kahoot-blue text-xs px-4 py-1.5">
+            <button @click="handleSubmit" :disabled="submitting" class="btn-kahoot bg-kahoot-blue text-xs px-4 py-1.5">
               {{ submitting ? 'Submitting…' : 'Submit' }}
             </button>
           </div>
@@ -186,26 +174,27 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSession } from '@/composables/useSession'
 import { useGame } from '@/composables/useGame'
+import { recordScore, subscribeToSession } from '@/services/sessionService'
+import { createQuestion } from '@/models'
 
 const route = useRoute()
-const { session, playerName } = useSession()
-
-const aiTopic = ref('')
+const { session, player, playerName } = useSession()
 
 const {
   question, language, code, output,
   testResults, submitted, running, submitting,
-  generating,
   timerSeconds, passedCount, totalTests, allPassed, lineCount,
   languages,
-  loadQuestion,
-  loadAIQuestion,
+  setQuestion,
   run, submit,
 } = useGame()
+
+const waitingForHost = ref(true)
+let unsubscribe = null
 
 const activeTab = ref('output')
 const resultTabs = [
@@ -222,18 +211,53 @@ function insertTab(e) {
   })
 }
 
-// FIXED: Updated to Vite-standard environment check
-if (import.meta.env.DEV) {
-  window.testAI = (topic) => loadAIQuestion(topic)
+async function handleSubmit() {
+  await submit()
+  if (!submitted.value || !session.value?.id || !player.value?.id) return
+
+  const elapsed = (question.value?.timeLimitSeconds ?? 300) - timerSeconds.value
+  const score = totalTests.value > 0
+    ? Math.round((passedCount.value / totalTests.value) * 100)
+    : 0
+
+  try {
+    await recordScore({
+      sessionId: session.value.id,
+      playerId: player.value.id,
+      questionTitle: question.value?.title ?? '',
+      score,
+      timeSeconds: elapsed,
+      code: code.value,
+      passed: allPassed.value,
+    })
+  } catch (e) {
+    console.error('Failed to record score:', e)
+  }
 }
 
-// In src/pages/GamePage.vue
 onMounted(() => {
-  if (route.query.qid) {
-    loadQuestion(route.query.qid)
-  } else {
-    // loadAIQuestion() <--- Comment this out for now!
-    console.log("Auto-load disabled. Click 'Gen AI' manually to test.")
-  }
+  const pin = route.query.pin
+  if (!pin) return
+
+  unsubscribe = subscribeToSession(pin, (session) => {
+    if (session.current_question) {
+      const q = session.current_question
+      setQuestion(createQuestion({
+        id: q.id ?? crypto.randomUUID(),
+        title: q.title,
+        description: q.description,
+        difficulty: q.difficulty ?? 'Easy',
+        category: q.category ?? '',
+        starterCode: q.starterCode ?? { python: '' },
+        testCases: q.testCases ?? [],
+        timeLimitSeconds: q.timeLimitSeconds ?? 300,
+      }))
+      waitingForHost.value = false
+    }
+  })
+})
+
+onUnmounted(() => {
+  if (unsubscribe) unsubscribe()
 })
 </script>

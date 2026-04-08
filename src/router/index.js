@@ -3,6 +3,7 @@ import HomePage from '@/pages/HomePage.vue'
 import GamePage from '@/pages/GamePage.vue'
 import ScoreboardPage from '@/pages/ScoreboardPage.vue'
 import AdminPage from '@/pages/AdminPage.vue'
+import HostPage from '@/pages/HostPage.vue'
 
 const routes = [
   {
@@ -24,6 +25,11 @@ const routes = [
     path: '/admin',
     name: 'Admin',
     component: AdminPage,
+  },
+  {
+    path: '/host',
+    name: 'Host',
+    component: HostPage,
   },
 ]
 
