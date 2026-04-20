@@ -5,7 +5,7 @@ import { createQuestion } from '@/models';
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 // Use the 2.0 version that worked in your testing
-const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-3.1-flash-lite-preview";
 
 const SYSTEM_PROMPT = `
 You are the CoHooter Question Engine. Generate an EASY Python 3 coding challenge.
