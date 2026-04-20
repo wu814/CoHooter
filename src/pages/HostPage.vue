@@ -3,25 +3,40 @@
     <div class="max-w-4xl mx-auto">
 
       <!-- Header -->
-      <div class="flex items-center justify-between mb-8">
-        <div>
-          <h1 class="text-3xl font-bold text-white">Host Session</h1>
-          <p class="text-white/50 mt-1">
-            PIN: <span class="text-kahoot-yellow font-mono text-2xl font-black">{{ pin }}</span>
-            <span class="text-white/30 ml-2">— share this with your students</span>
-          </p>
+      <div class="mb-8">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 class="text-3xl font-bold text-white">Host Session</h1>
+            <p class="text-white/50 mt-1">
+              PIN: <span class="text-kahoot-yellow font-mono text-2xl font-black">{{ pin }}</span>
+              <span class="text-white/30 ml-2">— share this with your students</span>
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-3 shrink-0">
+            <button
+              type="button"
+              class="btn-kahoot bg-kahoot-red text-sm"
+              :disabled="!pin || sessionEnded"
+              @click="handleEndSession"
+            >
+              End session
+            </button>
+            <button
+              type="button"
+              class="btn-kahoot bg-kahoot-blue text-sm"
+              :disabled="!pin"
+              @click="openScoreboard"
+            >
+              Scoreboard
+            </button>
+            <RouterLink to="/admin" class="btn-kahoot bg-white/10 text-sm">
+              Back
+            </RouterLink>
+          </div>
         </div>
-        <div class="flex gap-3">
-          <RouterLink
-            :to="{ name: 'Scoreboard', query: { pin } }"
-            class="btn-kahoot bg-kahoot-blue text-sm"
-          >
-            Scoreboard
-          </RouterLink>
-          <RouterLink to="/admin" class="btn-kahoot bg-white/10 text-sm">
-            Back
-          </RouterLink>
-        </div>
+        <p v-if="sessionEnded" class="mt-3 text-sm font-semibold text-kahoot-green">
+          This session has ended. Students see the final scoreboard on their game screen.
+        </p>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -60,11 +75,12 @@
                 placeholder="e.g. Strings, Arrays, Math..."
                 class="flex-1 bg-gray-950 text-white text-sm px-4 py-3 rounded-lg border border-white/10
                        outline-none focus:ring-2 focus:ring-kahoot-purple-light"
+                :disabled="sessionEnded"
                 @keyup.enter="handleGenerate"
               />
               <button
                 @click="handleGenerate"
-                :disabled="generating"
+                :disabled="generating || sessionEnded"
                 class="btn-kahoot bg-kahoot-purple text-sm"
               >
                 {{ generating ? 'Generating...' : 'Generate' }}
@@ -80,7 +96,7 @@
               </h2>
               <button
                 @click="handlePush"
-                :disabled="pushing"
+                :disabled="pushing || sessionEnded"
                 class="btn-kahoot bg-kahoot-green text-sm"
               >
                 {{ pushing ? 'Pushing...' : 'Push to All Students' }}
@@ -134,10 +150,16 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { generateQuestion } from '@/services/questionService'
-import { pushQuestion, fetchSessionPlayers } from '@/services/sessionService'
+import { pushQuestion, fetchSessionPlayers, endSession, fetchSessionByPin, subscribeToSession } from '@/services/sessionService'
+import { useScoreboardOverlay } from '@/composables/useScoreboardOverlay'
 
 const route = useRoute()
 const pin = route.query.pin ?? ''
+const { open: openScoreboardOverlay } = useScoreboardOverlay()
+
+function openScoreboard() {
+  if (pin) openScoreboardOverlay(pin)
+}
 
 const topic = ref('')
 const question = ref(null)
@@ -145,8 +167,26 @@ const generating = ref(false)
 const pushing = ref(false)
 const pushed = ref(false)
 const players = ref([])
+const sessionEnded = ref(false)
 
 let playerPoll = null
+let sessionUnsub = null
+
+async function loadSessionStatus() {
+  const row = await fetchSessionByPin(pin)
+  if (row?.status === 'completed') sessionEnded.value = true
+}
+
+async function handleEndSession() {
+  if (!pin) return
+  if (!confirm('End this session for everyone? Students will see the final scoreboard and the game will stop.')) return
+  try {
+    await endSession(pin)
+    sessionEnded.value = true
+  } catch (e) {
+    alert(e.message)
+  }
+}
 
 async function handleGenerate() {
   generating.value = true
@@ -177,12 +217,19 @@ async function refreshPlayers() {
   players.value = await fetchSessionPlayers(pin)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadSessionStatus()
   refreshPlayers()
   playerPoll = setInterval(refreshPlayers, 5000)
+  if (pin) {
+    sessionUnsub = subscribeToSession(pin, (row) => {
+      if (row.status === 'completed') sessionEnded.value = true
+    })
+  }
 })
 
 onUnmounted(() => {
   if (playerPoll) clearInterval(playerPoll)
+  if (sessionUnsub) sessionUnsub()
 })
 </script>

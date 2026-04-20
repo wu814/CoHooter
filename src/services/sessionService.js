@@ -103,9 +103,22 @@ export async function fetchLeaderboard(pin) {
   }))
 }
 
+/** Max points per question when answered instantly (Kahoot-style time decay applies). */
+export const MAX_POINTS_PER_QUESTION = 1000
+
 /**
- * Record a player's score for a question.
- * Inserts a submission row and increments the player's running totals.
+ * Points for a fully correct answer: linear in time remaining (slower = fewer points).
+ * Remaining fraction is clamped to at least 10% so a last-second correct answer still earns something.
+ */
+export function computeTimeBasedPoints(secondsRemaining, timeLimitSeconds, maxPoints = MAX_POINTS_PER_QUESTION) {
+  const limit = Math.max(1, timeLimitSeconds)
+  const ratio = Math.min(1, Math.max(0.1, secondsRemaining / limit))
+  return Math.round(maxPoints * ratio)
+}
+
+/**
+ * Record a submission. Wrong answers are logged only (no leaderboard change).
+ * Correct answers add `score` to the player and increment questions_completed.
  */
 export async function recordScore({ sessionId, playerId, questionTitle, score, timeSeconds, code, passed }) {
   const { error: subError } = await supabase
@@ -116,11 +129,13 @@ export async function recordScore({ sessionId, playerId, questionTitle, score, t
       question_title: questionTitle,
       code,
       passed,
-      score,
+      score: passed ? score : 0,
       time_seconds: timeSeconds,
     })
 
   if (subError) throw new Error(subError.message)
+
+  if (!passed) return
 
   const { data: current, error: fetchError } = await supabase
     .from('players')
@@ -156,6 +171,35 @@ export async function pushQuestion(pin, question) {
     .eq('pin', pin)
 
   if (error) throw new Error(error.message)
+}
+
+/**
+ * Mark a session as finished (host / admin). Students see final scoreboard via Realtime.
+ */
+export async function endSession(pin) {
+  const { error } = await supabase
+    .from('game_sessions')
+    .update({
+      status: 'completed',
+      ended_at: new Date().toISOString(),
+    })
+    .eq('pin', pin)
+
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Load session row by PIN (status, etc.).
+ */
+export async function fetchSessionByPin(pin) {
+  const { data, error } = await supabase
+    .from('game_sessions')
+    .select('status, ended_at, current_question')
+    .eq('pin', pin)
+    .single()
+
+  if (error) return null
+  return data
 }
 
 /**
@@ -204,25 +248,74 @@ export function subscribeToSession(pin, onChange) {
 }
 
 /**
+ * Mean completion % across all players.
+ *
+ * For each session we estimate how many questions were "in play" as
+ *   max(1, distinct passed question_title in that session, max(questions_completed) among players there).
+ * Each player's rate is min(100, round(100 * questions_completed / denom)).
+ * Returns an integer 0–100, or 0 if there are no players.
+ */
+export async function computeAverageCompletionPercent() {
+  const { data: playersRows, error: playersError } = await supabase
+    .from('players')
+    .select('session_id, questions_completed')
+
+  if (playersError || !playersRows?.length) return 0
+
+  const { data: passedSubs, error: subError } = await supabase
+    .from('submissions')
+    .select('session_id, question_title')
+    .eq('passed', true)
+
+  if (subError) return 0
+
+  const distinctTitlesBySession = new Map()
+  for (const row of passedSubs || []) {
+    if (!row.session_id || !row.question_title) continue
+    if (!distinctTitlesBySession.has(row.session_id))
+      distinctTitlesBySession.set(row.session_id, new Set())
+    distinctTitlesBySession.get(row.session_id).add(row.question_title)
+  }
+
+  const maxCompletedBySession = new Map()
+  for (const p of playersRows) {
+    const sid = p.session_id
+    const qc = p.questions_completed ?? 0
+    maxCompletedBySession.set(sid, Math.max(maxCompletedBySession.get(sid) || 0, qc))
+  }
+
+  let sumRates = 0
+  for (const p of playersRows) {
+    const sid = p.session_id
+    const distinctCount = distinctTitlesBySession.get(sid)?.size ?? 0
+    const maxInSession = maxCompletedBySession.get(sid) || 0
+    const denom = Math.max(1, distinctCount, maxInSession)
+    const qc = p.questions_completed ?? 0
+    const rate = Math.min(100, Math.round((100 * qc) / denom))
+    sumRates += rate
+  }
+
+  return Math.round(sumRates / playersRows.length)
+}
+
+/**
  * Fetch aggregate analytics for the admin dashboard.
  */
 export async function fetchAdminStats() {
-  const { data: sessions } = await supabase
-    .from('game_sessions')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const [sessionsRes, playersCountRes, avgCompletion] = await Promise.all([
+    supabase.from('game_sessions').select('*').order('created_at', { ascending: false }),
+    supabase.from('players').select('*', { count: 'exact', head: true }),
+    computeAverageCompletionPercent(),
+  ])
 
-  const { count: totalPlayers } = await supabase
-    .from('players')
-    .select('*', { count: 'exact', head: true })
-
-  const allSessions = sessions || []
+  const allSessions = sessionsRes.data || []
+  const totalPlayers = playersCountRes.count || 0
   const activeSessions = allSessions.filter(s => s.status === 'active').length
 
   return {
     totalSessions: allSessions.length,
-    totalPlayers: totalPlayers || 0,
-    avgCompletion: 0,
+    totalPlayers: totalPlayers ?? 0,
+    avgCompletion,
     activeSessions,
     sessions: allSessions.map(s => createSession({
       id: s.id,

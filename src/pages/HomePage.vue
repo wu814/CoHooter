@@ -64,6 +64,7 @@
     </div>
 
     <RouterLink
+      v-if="!player"
       to="/admin"
       class="mt-8 text-sm text-white/40 hover:text-white/70 underline underline-offset-4 transition"
     >
@@ -78,7 +79,7 @@ import { useRouter } from 'vue-router'
 import { useSession } from '@/composables/useSession'
 
 const router = useRouter()
-const { join, loading: sessionLoading, error: sessionError } = useSession()
+const { join, player, loading: sessionLoading, error: sessionError } = useSession()
 
 const gamePin = ref('')
 const nickname = ref('')

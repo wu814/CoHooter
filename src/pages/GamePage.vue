@@ -9,13 +9,7 @@
           Playing as <strong class="text-kahoot-yellow">{{ playerName }}</strong>
         </span>
       </div>
-      <div class="flex items-center gap-3">
-        <RouterLink
-          :to="{ name: 'Scoreboard', query: { pin: $route.query.pin } }"
-          class="text-xs font-semibold text-white/40 hover:text-white transition"
-        >
-          Scoreboard
-        </RouterLink>
+      <div class="flex items-center gap-2 sm:gap-3">
         <div class="flex items-center gap-2 text-sm">
           <div
             :class="timerSeconds <= 10 ? 'bg-kahoot-red animate-pulse' : 'bg-kahoot-purple-light'"
@@ -88,22 +82,27 @@
         <div class="flex items-center justify-between px-4 py-2 bg-gray-900/80 border-b border-white/10">
           <select
             v-model="language"
+            :disabled="showFinalScoreboard"
             class="bg-gray-800 text-white text-sm rounded-md px-3 py-1.5 border border-white/10
-                   focus:outline-none focus:ring-1 focus:ring-kahoot-purple-light"
+                   focus:outline-none focus:ring-1 focus:ring-kahoot-purple-light disabled:opacity-50"
           >
             <option v-for="lang in languages" :key="lang.id" :value="lang.id">
               {{ lang.label }}
             </option>
           </select>
           <div class="flex gap-2">
-            <button @click="run" :disabled="running" class="btn-kahoot bg-kahoot-green text-xs px-4 py-1.5">
+            <button @click="run" :disabled="running || showFinalScoreboard" class="btn-kahoot bg-kahoot-green text-xs px-4 py-1.5">
               <svg class="w-3.5 h-3.5 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.344-5.891a1.5 1.5 0 000-2.538L6.3 2.841z" />
               </svg>
               {{ running ? 'Running…' : 'Run' }}
             </button>
-            <button @click="handleSubmit" :disabled="submitting" class="btn-kahoot bg-kahoot-blue text-xs px-4 py-1.5">
-              {{ submitting ? 'Submitting…' : 'Submit' }}
+            <button
+              @click="handleSubmit"
+              :disabled="submitting || submitLocked || showFinalScoreboard"
+              class="btn-kahoot bg-kahoot-blue text-xs px-4 py-1.5"
+            >
+              {{ submitButtonLabel }}
             </button>
           </div>
         </div>
@@ -118,6 +117,7 @@
             <textarea
               v-model="code"
               spellcheck="false"
+              :readonly="showFinalScoreboard"
               class="flex-1 bg-gray-900 text-green-400 font-mono text-sm p-4 pl-3
                      leading-5 resize-none outline-none overflow-auto"
               @keydown.tab.prevent="insertTab"
@@ -170,16 +170,108 @@
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="showScorePopup"
+        class="fixed inset-0 z-[110] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="score-popup-title"
+      >
+        <div
+          class="absolute inset-0 bg-black/70"
+          aria-hidden="true"
+          @click="closeScorePopup"
+        />
+        <div
+          class="relative card-kahoot max-w-sm w-full p-8 text-center shadow-2xl border border-white/20"
+          @click.stop
+        >
+          <p
+            id="score-popup-title"
+            class="text-lg font-bold"
+            :class="scorePopupSuccess ? 'text-kahoot-green' : 'text-white'"
+          >
+            {{ scorePopupTitle }}
+          </p>
+
+          <div v-if="scorePopupPoints > 0" class="mt-6">
+            <p class="text-xs font-bold uppercase tracking-wider text-white/40">You earned</p>
+            <p class="text-5xl font-black text-kahoot-yellow mt-1">+{{ scorePopupPoints }}</p>
+            <p class="text-sm text-white/50 mt-1">points</p>
+          </div>
+          <div v-else-if="scorePopupShowZero" class="mt-6">
+            <p class="text-3xl font-black text-white/30">0</p>
+            <p class="text-sm text-white/50 mt-1">points this round</p>
+          </div>
+          <div v-else-if="scorePopupSuccess" class="mt-6 text-6xl leading-none text-kahoot-green" aria-hidden="true">
+            ✓
+          </div>
+
+          <p class="text-sm text-white/60 mt-6 leading-relaxed">{{ scorePopupSubtitle }}</p>
+
+          <button
+            type="button"
+            class="btn-kahoot bg-kahoot-purple-light w-full mt-8 justify-center"
+            @click="closeScorePopup"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="showFinalScoreboard && gamePin"
+        class="fixed inset-0 z-[125] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="final-scoreboard-title"
+      >
+        <div class="absolute inset-0 bg-black/80" aria-hidden="true" />
+        <div
+          class="relative card-kahoot w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl border border-white/20 overflow-hidden"
+          @click.stop
+        >
+          <div id="final-scoreboard-title" class="px-5 pt-5 pb-2 shrink-0">
+            <p class="text-xs font-bold uppercase tracking-wider text-white/40">Session ended</p>
+            <p class="text-xl font-black text-white mt-1">Final scoreboard</p>
+            <p class="text-sm text-white/50 mt-1">Thanks for playing, {{ playerName }}.</p>
+          </div>
+          <div class="flex-1 min-h-[280px] border-t border-white/10">
+            <LeaderboardPanel
+              :key="'final-' + gamePin"
+              :pin="gamePin"
+              :highlight-player-id="player?.id ?? ''"
+              panel-title="Standings"
+              :show-close="false"
+              :poll-interval-ms="0"
+            />
+          </div>
+          <div class="px-5 py-4 border-t border-white/10 shrink-0">
+            <RouterLink
+              to="/"
+              class="btn-kahoot bg-kahoot-purple-light w-full justify-center text-sm"
+            >
+              Back to home
+            </RouterLink>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSession } from '@/composables/useSession'
 import { useGame } from '@/composables/useGame'
-import { recordScore, subscribeToSession } from '@/services/sessionService'
+import { recordScore, subscribeToSession, computeTimeBasedPoints, fetchSessionByPin } from '@/services/sessionService'
 import { createQuestion } from '@/models'
+import LeaderboardPanel from '@/components/LeaderboardPanel.vue'
 
 const route = useRoute()
 const { session, player, playerName } = useSession()
@@ -190,11 +282,66 @@ const {
   timerSeconds, passedCount, totalTests, allPassed, lineCount,
   languages,
   setQuestion,
+  stopTimer,
   run, submit,
 } = useGame()
 
+/** Question id we already awarded points for (prevents double-submit on correct answer). */
+const creditedQuestionId = ref(null)
+const lastScoredPoints = ref(0)
+
+const showScorePopup = ref(false)
+const scorePopupTitle = ref('')
+const scorePopupSubtitle = ref('')
+const scorePopupPoints = ref(0)
+const scorePopupSuccess = ref(false)
+const scorePopupShowZero = ref(false)
+
+watch(
+  () => question.value?.id,
+  () => {
+    creditedQuestionId.value = null
+    lastScoredPoints.value = 0
+  }
+)
+
+function closeScorePopup() {
+  showScorePopup.value = false
+}
+
+function openScorePopup({ title, subtitle, points = 0, success = false, showZero = false }) {
+  scorePopupTitle.value = title
+  scorePopupSubtitle.value = subtitle
+  scorePopupPoints.value = points
+  scorePopupSuccess.value = success
+  scorePopupShowZero.value = showZero
+  showScorePopup.value = true
+}
+
+const submitLocked = computed(
+  () =>
+    submitted.value &&
+    allPassed.value &&
+    creditedQuestionId.value === question.value?.id
+)
+
+const submitButtonLabel = computed(() => {
+  if (submitting.value) return 'Submitting…'
+  if (submitLocked.value) return 'Scored'
+  return 'Submit'
+})
+
 const waitingForHost = ref(true)
+const showFinalScoreboard = ref(false)
+const gamePin = computed(() => String(route.query.pin ?? ''))
+
 let unsubscribe = null
+
+function applySessionEnded() {
+  stopTimer()
+  showFinalScoreboard.value = true
+  showScorePopup.value = false
+}
 
 const activeTab = ref('output')
 const resultTabs = [
@@ -212,26 +359,91 @@ function insertTab(e) {
 }
 
 async function handleSubmit() {
+  if (showFinalScoreboard.value) return
   await submit()
-  if (!submitted.value || !session.value?.id || !player.value?.id) return
+  activeTab.value = 'results'
 
-  const elapsed = (question.value?.timeLimitSeconds ?? 300) - timerSeconds.value
-  const score = totalTests.value > 0
-    ? Math.round((passedCount.value / totalTests.value) * 100)
-    : 0
+  if (!submitted.value) return
+
+  if (!session.value?.id || !player.value?.id) {
+    openScorePopup({
+      title: allPassed.value ? 'All tests passed!' : 'Results',
+      subtitle: allPassed.value
+        ? 'Scores are saved when you join a game with a PIN from the home page.'
+        : `${passedCount.value}/${totalTests.value} tests passed. Join a live session to save attempts.`,
+      points: 0,
+      success: allPassed.value,
+      showZero: !allPassed.value,
+    })
+    return
+  }
+
+  const timeLimit = question.value?.timeLimitSeconds ?? 300
+  const secondsRemaining = Math.max(0, timerSeconds.value)
+  const elapsed = Math.max(0, timeLimit - secondsRemaining)
+  const qid = question.value?.id ?? ''
 
   try {
+    if (!allPassed.value) {
+      await recordScore({
+        sessionId: session.value.id,
+        playerId: player.value.id,
+        questionTitle: question.value?.title ?? '',
+        score: 0,
+        timeSeconds: elapsed,
+        code: code.value,
+        passed: false,
+      })
+      openScorePopup({
+        title: 'Not quite',
+        subtitle: `${passedCount.value} of ${totalTests.value} tests passed. Fix your code and try again — no points until all pass.`,
+        points: 0,
+        success: false,
+        showZero: true,
+      })
+      return
+    }
+
+    if (creditedQuestionId.value === qid) {
+      openScorePopup({
+        title: 'Already scored',
+        subtitle: `You already earned points for this question.`,
+        points: lastScoredPoints.value,
+        success: true,
+        showZero: lastScoredPoints.value === 0,
+      })
+      return
+    }
+
+    const points = computeTimeBasedPoints(secondsRemaining, timeLimit)
     await recordScore({
       sessionId: session.value.id,
       playerId: player.value.id,
       questionTitle: question.value?.title ?? '',
-      score,
+      score: points,
       timeSeconds: elapsed,
       code: code.value,
-      passed: allPassed.value,
+      passed: true,
+    })
+    creditedQuestionId.value = qid
+    lastScoredPoints.value = points
+    openScorePopup({
+      title: 'Correct!',
+      subtitle: 'Faster answers earn more points. Check the scoreboard to see your rank.',
+      points,
+      success: true,
+      showZero: false,
     })
   } catch (e) {
     console.error('Failed to record score:', e)
+    output.value = `Could not save score: ${e.message}`
+    openScorePopup({
+      title: 'Could not save score',
+      subtitle: e.message ?? 'Please try again.',
+      points: 0,
+      success: false,
+      showZero: true,
+    })
   }
 }
 
@@ -239,7 +451,16 @@ onMounted(() => {
   const pin = route.query.pin
   if (!pin) return
 
-  unsubscribe = subscribeToSession(pin, (session) => {
+  ;(async () => {
+    const row = await fetchSessionByPin(String(pin))
+    if (row?.status === 'completed') applySessionEnded()
+  })()
+
+  unsubscribe = subscribeToSession(String(pin), (session) => {
+    if (session.status === 'completed') {
+      applySessionEnded()
+      return
+    }
     if (session.current_question) {
       const q = session.current_question
       setQuestion(createQuestion({

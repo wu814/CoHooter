@@ -44,6 +44,7 @@
                 <th class="text-left px-6 py-3 font-semibold">Players</th>
                 <th class="text-left px-6 py-3 font-semibold">Avg Score</th>
                 <th class="text-left px-6 py-3 font-semibold">Status</th>
+                <th class="text-right px-6 py-3 font-semibold">Actions</th>
                 <th class="text-right px-6 py-3 font-semibold">Created</th>
               </tr>
             </thead>
@@ -63,6 +64,17 @@
                     {{ s.status }}
                   </span>
                 </td>
+                <td class="px-6 py-4 text-right">
+                  <button
+                    v-if="s.status !== 'completed'"
+                    type="button"
+                    class="btn-kahoot bg-kahoot-red/90 text-xs px-3 py-1"
+                    @click.stop="handleEndSessionRow(s)"
+                  >
+                    End
+                  </button>
+                  <span v-else class="text-white/25 text-xs">—</span>
+                </td>
                 <td class="px-6 py-4 text-white/40 text-right">
                   {{ s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—' }}
                 </td>
@@ -78,7 +90,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchAdminStats, createGameSession } from '@/services/sessionService'
+import { fetchAdminStats, createGameSession, endSession } from '@/services/sessionService'
 
 const router = useRouter()
 
@@ -109,6 +121,17 @@ async function handleNewSession() {
     router.push({ name: 'Host', query: { pin: session.pin } })
   } catch (e) {
     alert(`Failed to create session: ${e.message}`)
+  }
+}
+
+async function handleEndSessionRow(s) {
+  if (!s.pin || s.status === 'completed') return
+  if (!confirm(`End session ${s.pin}? Students on the game screen will see the final scoreboard.`)) return
+  try {
+    await endSession(s.pin)
+    stats.value = await fetchAdminStats()
+  } catch (e) {
+    alert(`Failed to end session: ${e.message}`)
   }
 }
 

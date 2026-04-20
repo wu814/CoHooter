@@ -17,12 +17,14 @@
       </div>
 
       <div v-else-if="!entries.length" class="card-kahoot p-12 text-center">
-        <p class="text-white/40 text-lg">No scores yet.</p>
-        <p class="text-white/25 text-sm mt-1">
-          Implement <code class="bg-white/10 px-1.5 py-0.5 rounded text-xs">fetchLeaderboard()</code>
-          in <code class="bg-white/10 px-1.5 py-0.5 rounded text-xs">services/sessionService.js</code>
-          to populate this board.
-        </p>
+        <template v-if="!$route.query.pin">
+          <p class="text-white/40 text-lg">Enter a game PIN</p>
+          <p class="text-white/25 text-sm mt-1">Join a game from Home, or open this page with <code class="bg-white/10 px-1 rounded text-xs">?pin=</code> in the URL.</p>
+        </template>
+        <template v-else>
+          <p class="text-white/40 text-lg">No players in this session yet.</p>
+          <p class="text-white/25 text-sm mt-1">Players appear here after they join. Scores update when they submit answers.</p>
+        </template>
         <RouterLink
           to="/"
           class="btn-kahoot bg-kahoot-purple-light text-sm mt-6 inline-flex"

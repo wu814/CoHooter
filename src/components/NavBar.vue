@@ -8,13 +8,25 @@
         </RouterLink>
         <div class="flex items-center gap-2">
           <RouterLink
-            v-for="link in navLinks"
+            v-for="link in navRouterLinks"
             :key="link.to"
             :to="link.to"
             class="rounded-lg px-3 py-2 text-sm font-semibold text-white/60 hover:bg-white/10 hover:text-white transition"
           >
             {{ link.label }}
           </RouterLink>
+          <button
+            type="button"
+            class="rounded-lg px-3 py-2 text-sm font-semibold transition"
+            :class="resolvedScoreboardPin
+              ? 'text-white/60 hover:bg-white/10 hover:text-white'
+              : 'text-white/25 cursor-not-allowed'"
+            :disabled="!resolvedScoreboardPin"
+            :title="scoreboardTitle"
+            @click="openNavScoreboard"
+          >
+            Scoreboard
+          </button>
         </div>
       </div>
     </nav>
@@ -22,9 +34,36 @@
 </template>
 
 <script setup>
-const navLinks = [
-  { to: '/', label: 'Home' },
-  { to: '/scoreboard', label: 'Scoreboard' },
-  { to: '/admin', label: 'Admin' },
-]
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useSession } from '@/composables/useSession'
+import { useScoreboardOverlay } from '@/composables/useScoreboardOverlay'
+
+const route = useRoute()
+const { session, player } = useSession()
+const { open } = useScoreboardOverlay()
+
+const navRouterLinks = computed(() => {
+  const links = [{ to: '/', label: 'Home' }]
+  if (!player.value) {
+    links.push({ to: '/admin', label: 'Admin' })
+  }
+  return links
+})
+
+const resolvedScoreboardPin = computed(() =>
+  String(session.value?.pin || route.query.pin || '').trim()
+)
+
+const scoreboardTitle = computed(() =>
+  resolvedScoreboardPin.value
+    ? 'Open session scoreboard'
+    : 'Join a game (or open Host) so this session has a PIN'
+)
+
+function openNavScoreboard() {
+  const p = resolvedScoreboardPin.value
+  if (!p) return
+  open(p)
+}
 </script>
