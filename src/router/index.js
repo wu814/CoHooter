@@ -4,7 +4,9 @@ import GamePage from '@/pages/GamePage.vue'
 import ScoreboardPage from '@/pages/ScoreboardPage.vue'
 import AdminPage from '@/pages/AdminPage.vue'
 import HostPage from '@/pages/HostPage.vue'
-import { useSession } from '@/composables/useSession'
+import LoginPage from '@/pages/LoginPage.vue'
+import SignUpPage from '@/pages/SignUpPage.vue'
+import { supabase } from '@/lib/supabase'
 
 const routes = [
   {
@@ -26,12 +28,22 @@ const routes = [
     path: '/admin',
     name: 'Admin',
     component: AdminPage,
-    meta: { educatorOnly: true },
+    meta: { requiresAuth: true },
   },
   {
     path: '/host',
     name: 'Host',
     component: HostPage,
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: LoginPage,
+  },
+  {
+    path: '/signup',
+    name: 'SignUp',
+    component: SignUpPage,
   },
 ]
 
@@ -40,12 +52,10 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
-  if (!to.meta?.educatorOnly) return true
-  const { player } = useSession()
-  if (player.value) {
-    return { name: 'Home' }
-  }
+router.beforeEach(async (to) => {
+  if (!to.meta?.requiresAuth) return true
+  const { data } = await supabase.auth.getSession()
+  if (!data.session) return { name: 'Login' }
   return true
 })
 

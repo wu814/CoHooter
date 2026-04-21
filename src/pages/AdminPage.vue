@@ -57,8 +57,8 @@
               >
                 <td class="px-6 py-4 font-semibold text-white">{{ s.name }}</td>
                 <td class="px-6 py-4 font-mono text-kahoot-yellow">{{ s.pin }}</td>
-                <td class="px-6 py-4 text-white/70">{{ s.players?.length ?? 0 }}</td>
-                <td class="px-6 py-4 text-white/70">—</td>
+                <td class="px-6 py-4 text-white/70">{{ s.playerCount ?? 0 }}</td>
+                <td class="px-6 py-4 text-white/70">{{ s.avgScore !== null ? s.avgScore : '—' }}</td>
                 <td class="px-6 py-4">
                   <span :class="statusBadge(s.status)" class="text-xs font-bold px-2.5 py-0.5 rounded-full">
                     {{ s.status }}
@@ -84,6 +84,11 @@
         </div>
       </div>
     </div>
+
+    <!-- Charts -->
+    <div class="mt-8">
+      <AdminCharts :sessions="stats.sessions" />
+    </div>
   </div>
 </template>
 
@@ -91,8 +96,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchAdminStats, createGameSession, endSession } from '@/services/sessionService'
+import { useAuth } from '@/composables/useAuth'
+import AdminCharts from '@/components/AdminCharts.vue'
 
 const router = useRouter()
+const { user } = useAuth()
 
 const loading = ref(false)
 const stats = ref({ totalSessions: 0, totalPlayers: 0, avgCompletion: 0, activeSessions: 0, sessions: [] })
@@ -117,7 +125,7 @@ function statusBadge(status) {
 
 async function handleNewSession() {
   try {
-    const session = await createGameSession({ hostId: 'admin' })
+    const session = await createGameSession({ hostId: user.value?.id ?? 'admin' })
     router.push({ name: 'Host', query: { pin: session.pin } })
   } catch (e) {
     alert(`Failed to create session: ${e.message}`)
