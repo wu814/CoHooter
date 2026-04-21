@@ -248,17 +248,16 @@ export function subscribeToSession(pin, onChange) {
 }
 
 /**
- * Mean completion % across all players.
- *
- * For each session we estimate how many questions were "in play" as
- *   max(1, distinct passed question_title in that session, max(questions_completed) among players there).
- * Each player's rate is min(100, round(100 * questions_completed / denom)).
- * Returns an integer 0–100, or 0 if there are no players.
+ * Mean completion % across sessions owned by the current user.
+ * Scoped to the provided session IDs so stats never bleed across accounts.
  */
-export async function computeAverageCompletionPercent() {
+async function computeAverageCompletionPercent(sessionIds) {
+  if (!sessionIds.length) return 0
+
   const { data: playersRows, error: playersError } = await supabase
     .from('players')
     .select('session_id, questions_completed')
+    .in('session_id', sessionIds)
 
   if (playersError || !playersRows?.length) return 0
 
@@ -266,6 +265,7 @@ export async function computeAverageCompletionPercent() {
     .from('submissions')
     .select('session_id, question_title')
     .eq('passed', true)
+    .in('session_id', sessionIds)
 
   if (subError) return 0
 
@@ -299,22 +299,34 @@ export async function computeAverageCompletionPercent() {
 }
 
 /**
- * Fetch aggregate analytics for the admin dashboard.
+ * Fetch aggregate analytics for the admin dashboard, scoped to the signed-in user.
  */
 export async function fetchAdminStats() {
-  const [sessionsRes, playersCountRes, avgCompletion] = await Promise.all([
-    supabase.from('game_sessions').select('*').order('created_at', { ascending: false }),
-    supabase.from('players').select('*', { count: 'exact', head: true }),
-    computeAverageCompletionPercent(),
-  ])
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const sessionsRes = await supabase
+    .from('game_sessions')
+    .select('*')
+    .eq('host_id', user.id)
+    .order('created_at', { ascending: false })
 
   const allSessions = sessionsRes.data || []
-  const totalPlayers = playersCountRes.count || 0
+  const sessionIds = allSessions.map(s => s.id)
+
+  const [playersCountRes, avgCompletion] = await Promise.all([
+    sessionIds.length
+      ? supabase.from('players').select('*', { count: 'exact', head: true }).in('session_id', sessionIds)
+      : Promise.resolve({ count: 0 }),
+    computeAverageCompletionPercent(sessionIds),
+  ])
+
+  const totalPlayers = playersCountRes.count ?? 0
   const activeSessions = allSessions.filter(s => s.status === 'active').length
 
   return {
     totalSessions: allSessions.length,
-    totalPlayers: totalPlayers ?? 0,
+    totalPlayers,
     avgCompletion,
     activeSessions,
     sessions: allSessions.map(s => createSession({

@@ -84,6 +84,11 @@
         </div>
       </div>
     </div>
+
+    <!-- Charts -->
+    <div class="mt-8">
+      <AdminCharts :sessions="stats.sessions" />
+    </div>
   </div>
 </template>
 
@@ -91,8 +96,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchAdminStats, createGameSession, endSession } from '@/services/sessionService'
+import { useAuth } from '@/composables/useAuth'
+import AdminCharts from '@/components/AdminCharts.vue'
 
 const router = useRouter()
+const { user } = useAuth()
 
 const loading = ref(false)
 const stats = ref({ totalSessions: 0, totalPlayers: 0, avgCompletion: 0, activeSessions: 0, sessions: [] })
@@ -117,7 +125,7 @@ function statusBadge(status) {
 
 async function handleNewSession() {
   try {
-    const session = await createGameSession({ hostId: 'admin' })
+    const session = await createGameSession({ hostId: user.value?.id ?? 'admin' })
     router.push({ name: 'Host', query: { pin: session.pin } })
   } catch (e) {
     alert(`Failed to create session: ${e.message}`)
