@@ -320,7 +320,7 @@ export async function fetchAdminStats() {
       : Promise.resolve({ count: 0 }),
     computeAverageCompletionPercent(sessionIds),
     sessionIds.length
-      ? supabase.from('submissions').select('session_id, passed').in('session_id', sessionIds)
+      ? supabase.from('submissions').select('session_id, passed, score').in('session_id', sessionIds)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -329,8 +329,9 @@ export async function fetchAdminStats() {
 
   const subsBySession = {}
   for (const sub of submissionsRes.data || []) {
-    if (!subsBySession[sub.session_id]) subsBySession[sub.session_id] = { passed: 0, total: 0 }
+    if (!subsBySession[sub.session_id]) subsBySession[sub.session_id] = { passed: 0, total: 0, totalScore: 0 }
     subsBySession[sub.session_id].total++
+    subsBySession[sub.session_id].totalScore += sub.score ?? 0
     if (sub.passed) subsBySession[sub.session_id].passed++
   }
 
@@ -352,6 +353,9 @@ export async function fetchAdminStats() {
       playerCount: s.players?.[0]?.count ?? 0,
       accuracy: subsBySession[s.id]?.total
         ? Math.round((subsBySession[s.id].passed / subsBySession[s.id].total) * 100)
+        : null,
+      avgScore: subsBySession[s.id]?.total
+        ? Math.round(subsBySession[s.id].totalScore / subsBySession[s.id].total)
         : null,
     })),
   }
