@@ -57,7 +57,7 @@
               >
                 <td class="px-6 py-4 font-semibold text-white">{{ s.name }}</td>
                 <td class="px-6 py-4 font-mono text-kahoot-yellow">{{ s.pin }}</td>
-                <td class="px-6 py-4 text-white/70">{{ s.players?.length ?? 0 }}</td>
+                <td class="px-6 py-4 text-white/70">{{ s.playerCount ?? 0 }}</td>
                 <td class="px-6 py-4 text-white/70">—</td>
                 <td class="px-6 py-4">
                   <span :class="statusBadge(s.status)" class="text-xs font-bold px-2.5 py-0.5 rounded-full">

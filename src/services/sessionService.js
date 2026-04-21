@@ -307,36 +307,52 @@ export async function fetchAdminStats() {
 
   const sessionsRes = await supabase
     .from('game_sessions')
-    .select('*')
+    .select('*, players(count)')
     .eq('host_id', user.id)
     .order('created_at', { ascending: false })
 
   const allSessions = sessionsRes.data || []
   const sessionIds = allSessions.map(s => s.id)
 
-  const [playersCountRes, avgCompletion] = await Promise.all([
+  const [playersCountRes, avgCompletion, submissionsRes] = await Promise.all([
     sessionIds.length
       ? supabase.from('players').select('*', { count: 'exact', head: true }).in('session_id', sessionIds)
       : Promise.resolve({ count: 0 }),
     computeAverageCompletionPercent(sessionIds),
+    sessionIds.length
+      ? supabase.from('submissions').select('session_id, passed').in('session_id', sessionIds)
+      : Promise.resolve({ data: [] }),
   ])
 
   const totalPlayers = playersCountRes.count ?? 0
-  const activeSessions = allSessions.filter(s => s.status === 'active').length
+  const activeSessions = allSessions.filter(s => s.status === 'active' || s.status === 'lobby').length
+
+  const subsBySession = {}
+  for (const sub of submissionsRes.data || []) {
+    if (!subsBySession[sub.session_id]) subsBySession[sub.session_id] = { passed: 0, total: 0 }
+    subsBySession[sub.session_id].total++
+    if (sub.passed) subsBySession[sub.session_id].passed++
+  }
 
   return {
     totalSessions: allSessions.length,
     totalPlayers,
     avgCompletion,
     activeSessions,
-    sessions: allSessions.map(s => createSession({
-      id: s.id,
-      pin: s.pin,
-      hostId: s.host_id,
-      status: s.status,
-      createdAt: s.created_at,
-      startedAt: s.started_at,
-      endedAt: s.ended_at,
+    sessions: allSessions.map(s => ({
+      ...createSession({
+        id: s.id,
+        pin: s.pin,
+        hostId: s.host_id,
+        status: s.status,
+        createdAt: s.created_at,
+        startedAt: s.started_at,
+        endedAt: s.ended_at,
+      }),
+      playerCount: s.players?.[0]?.count ?? 0,
+      accuracy: subsBySession[s.id]?.total
+        ? Math.round((subsBySession[s.id].passed / subsBySession[s.id].total) * 100)
+        : null,
     })),
   }
 }

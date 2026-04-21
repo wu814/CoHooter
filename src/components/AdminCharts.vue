@@ -17,12 +17,21 @@
         <p v-else class="flex items-center justify-center h-full text-white/30 text-sm">No session data yet</p>
       </div>
     </div>
+
+    <!-- Accuracy per Session -->
+    <div class="card-kahoot p-6 lg:col-span-2">
+      <h2 class="text-lg font-bold text-white mb-4">Accuracy per Session</h2>
+      <div class="h-56">
+        <Line v-if="hasAccuracyData" :data="accuracyChartData" :options="lineOptions" />
+        <p v-else class="flex items-center justify-center h-full text-white/30 text-sm">No submission data yet</p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { Doughnut, Bar } from 'vue-chartjs'
+import { Doughnut, Bar, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   ArcElement,
@@ -31,9 +40,12 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
+  Filler,
 } from 'chart.js'
 
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Filler)
 
 const props = defineProps({
   sessions: { type: Array, default: () => [] },
@@ -46,8 +58,9 @@ const STATUS_COLORS = {
   scheduled: '#ffb800',
 }
 
-const hasStatusData = computed(() => props.sessions.length > 0)
-const hasTimeData   = computed(() => props.sessions.length > 0)
+const hasStatusData   = computed(() => props.sessions.length > 0)
+const hasTimeData     = computed(() => props.sessions.length > 0)
+const hasAccuracyData = computed(() => props.sessions.some(s => s.accuracy !== null))
 
 const statusChartData = computed(() => {
   const counts = {}
@@ -84,6 +97,27 @@ const timeChartData = computed(() => {
   }
 })
 
+const accuracyChartData = computed(() => {
+  const withAccuracy = props.sessions
+    .filter(s => s.accuracy !== null)
+    .slice()
+    .reverse()
+
+  return {
+    labels: withAccuracy.map(s => s.pin),
+    datasets: [{
+      label: 'Accuracy %',
+      data: withAccuracy.map(s => s.accuracy),
+      borderColor: '#ffb800',
+      backgroundColor: 'rgba(255,184,0,0.15)',
+      pointBackgroundColor: '#ffb800',
+      pointRadius: 5,
+      tension: 0.3,
+      fill: true,
+    }],
+  }
+})
+
 const doughnutOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -108,6 +142,31 @@ const barOptions = {
     },
     y: {
       ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 },
+      grid:  { color: 'rgba(255,255,255,0.05)' },
+    },
+  },
+}
+
+const lineOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: ctx => ` ${ctx.parsed.y}% accuracy`,
+      },
+    },
+  },
+  scales: {
+    x: {
+      ticks: { color: 'rgba(255,255,255,0.4)' },
+      grid:  { color: 'rgba(255,255,255,0.05)' },
+    },
+    y: {
+      min: 0,
+      max: 100,
+      ticks: { color: 'rgba(255,255,255,0.4)', callback: v => v + '%' },
       grid:  { color: 'rgba(255,255,255,0.05)' },
     },
   },
